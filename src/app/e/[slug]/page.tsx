@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
+import { NavBar } from "@/components/NavBar";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,56 @@ export default async function EventPage({ params }: Props) {
     notFound();
   }
 
+  // Check if user is authenticated for citizens-only events
+  const cookieStore = await cookies();
+  const isAuthenticated = !!cookieStore.get("frontier_token")?.value;
+
+  if (event.visibility === "citizens" && !isAuthenticated) {
+    // Show teaser for citizens-only events
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <NavBar />
+        <main className="mx-auto max-w-4xl px-4 py-8">
+          {event.coverImageUrl && (
+            <div className="rounded-lg overflow-hidden mb-8 aspect-[2.5/1] bg-slate-800">
+              <img
+                src={event.coverImageUrl}
+                alt={event.title}
+                className="w-full h-full object-cover opacity-50"
+              />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold text-white mb-4">{event.title}</h1>
+          <p className="text-slate-400 mb-8">
+            This event is for Frontier Tower members only.
+          </p>
+          <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 text-center">
+            <p className="text-white font-semibold mb-2">
+              Sign in to see event details
+            </p>
+            <p className="text-slate-400 text-sm mb-4">
+              Create an account or sign in to access this event.
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link
+                href="/login"
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   const jsonLd = {
@@ -102,15 +154,15 @@ export default async function EventPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <header className="border-b border-slate-800">
-        <div className="mx-auto max-w-4xl px-4 py-4">
+      <NavBar />
+
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
             &larr; All Events
           </Link>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8">
         {event.coverImageUrl && (
           <div className="rounded-lg overflow-hidden mb-8 aspect-[2.5/1] bg-slate-800">
             <img

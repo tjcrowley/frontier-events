@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { db } from "@/db";
 import { events } from "@/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, ne } from "drizzle-orm";
+import { NavBar } from "@/components/NavBar";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +20,17 @@ function formatDate(date: Date): string {
 export default async function HomePage() {
   const now = new Date();
 
+  // Check if user is authenticated (has JWT cookie)
+  const cookieStore = await cookies();
+  const isAuthenticated = !!cookieStore.get("frontier_token")?.value;
+
   const upcomingEvents = await db.query.events.findMany({
-    where: and(eq(events.status, "published"), gt(events.startsAt, now)),
+    where: and(
+      eq(events.status, "published"),
+      gt(events.startsAt, now),
+      // Hide citizens-only events from unauthenticated visitors
+      ...(!isAuthenticated ? [ne(events.visibility, "citizens")] : []),
+    ),
     orderBy: events.startsAt,
     with: {
       ticketTypes: true,
@@ -28,21 +39,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-900">
-      <header className="border-b border-slate-800">
-        <div className="mx-auto max-w-5xl px-4 py-6 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-white">
-            Frontier Events
-          </Link>
-          <nav className="flex gap-4 text-sm">
-            <Link href="/admin" className="text-slate-400 hover:text-white transition-colors">
-              Admin
-            </Link>
-            <Link href="/scanner" className="text-slate-400 hover:text-white transition-colors">
-              Scanner
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <NavBar />
 
       <main className="mx-auto max-w-5xl px-4 py-12">
         <h1 className="text-3xl font-bold mb-2">Upcoming Events</h1>

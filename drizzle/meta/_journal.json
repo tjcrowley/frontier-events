@@ -8,6 +8,13 @@
       "when": 1774726339398,
       "tag": "0000_old_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774739780399,
+      "tag": "0001_easy_albert_cleary",
+      "breakpoints": true
     }
   ]
 }

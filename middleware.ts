@@ -4,7 +4,8 @@ import { jwtVerify } from "jose";
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 interface JWTPayload {
-  walletAddress: string;
+  sub: string; // userId
+  walletAddress: string | null;
   email: string;
   role: string;
   communities: string[];
@@ -12,7 +13,6 @@ interface JWTPayload {
 }
 
 async function getPayload(req: NextRequest): Promise<JWTPayload | null> {
-  // Check Authorization header first, then cookie
   const authHeader = req.headers.get("authorization");
   let token: string | undefined;
 
@@ -43,13 +43,13 @@ export async function middleware(req: NextRequest) {
       if (isApiRoute) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      return NextResponse.redirect(new URL("/auth-required", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
     if (payload.role !== "admin") {
       if (isApiRoute) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 401 });
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL("/auth-required", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
   }
 
@@ -59,27 +59,28 @@ export async function middleware(req: NextRequest) {
       if (isApiRoute) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      return NextResponse.redirect(new URL("/auth-required", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
     if (payload.role !== "admin" && payload.role !== "host") {
       if (isApiRoute) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 401 });
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL("/auth-required", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
   }
 
   // Account route: any auth
   if (pathname === "/account") {
     if (!payload) {
-      return NextResponse.redirect(new URL("/auth-required", req.url));
+      return NextResponse.redirect(new URL("/login", req.url));
     }
   }
 
   // Pass user info via headers for downstream use
   if (payload) {
     const response = NextResponse.next();
-    response.headers.set("x-wallet-address", payload.walletAddress);
+    response.headers.set("x-user-id", payload.sub);
+    response.headers.set("x-wallet-address", payload.walletAddress ?? "");
     response.headers.set("x-user-role", payload.role);
     response.headers.set("x-user-email", payload.email);
     return response;

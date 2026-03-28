@@ -14,6 +14,7 @@ interface UserEvent {
 
 export default function AccountPage() {
   const {
+    userId,
     walletAddress,
     email,
     firstName,
@@ -29,8 +30,7 @@ export default function AccountPage() {
   const [togglingNewsletter, setTogglingNewsletter] = useState(false);
 
   useEffect(() => {
-    if (!walletAddress) return;
-    // Load user's created events if admin
+    if (!userId) return;
     if (role === "admin") {
       fetch("/api/admin/events", {
         headers: {
@@ -43,7 +43,7 @@ export default function AccountPage() {
         })
         .catch(() => {});
     }
-  }, [walletAddress, role]);
+  }, [userId, role]);
 
   async function toggleNewsletter() {
     setTogglingNewsletter(true);
@@ -75,15 +75,21 @@ export default function AccountPage() {
     );
   }
 
-  if (!walletAddress) {
+  if (!userId) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <p className="text-slate-400">Please open in Frontier Wallet.</p>
+        <div className="text-center">
+          <p className="text-slate-400 mb-4">Please sign in to view your account.</p>
+          <a
+            href="/login"
+            className="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
+          >
+            Sign In
+          </a>
+        </div>
       </div>
     );
   }
-
-  const truncatedWallet = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -112,26 +118,32 @@ export default function AccountPage() {
           </div>
 
           <div className="grid gap-3 text-sm pt-2">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Wallet</span>
-              <span className="text-white font-mono">{truncatedWallet}</span>
-            </div>
+            {walletAddress && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Wallet</span>
+                <span className="text-white font-mono">
+                  {`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-slate-400">Role</span>
               <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-indigo-900/30 text-indigo-400">
                 {role}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Subscription</span>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                subscriptionStatus === "active"
-                  ? "bg-green-900/30 text-green-400"
-                  : "bg-slate-700 text-slate-300"
-              }`}>
-                {subscriptionStatus || "none"}
-              </span>
-            </div>
+            {subscriptionStatus && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Subscription</span>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  subscriptionStatus === "active"
+                    ? "bg-green-900/30 text-green-400"
+                    : "bg-slate-700 text-slate-300"
+                }`}>
+                  {subscriptionStatus}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

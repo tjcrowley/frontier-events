@@ -11,11 +11,14 @@ import { sql } from "drizzle-orm";
 
 // ── Users ───────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
-  walletAddress: text("wallet_address").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  walletAddress: text("wallet_address").unique(),
   email: text("email").notNull().unique(),
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarUrl: text("avatar_url"),
+  passwordHash: text("password_hash"),
+  authProvider: text("auth_provider").notNull().default("frontier"),
   subscriptionPlan: text("subscription_plan"),
   subscriptionStatus: text("subscription_status"),
   communities: text("communities").array(),
@@ -52,7 +55,7 @@ export const events = pgTable("events", {
   status: text("status").notNull().default("draft"),
   visibility: text("visibility").notNull().default("public"),
   capacity: integer("capacity"),
-  hostWalletAddress: text("host_wallet_address").references(() => users.walletAddress),
+  hostUserId: uuid("host_user_id").references(() => users.id),
   floorCommunitySlug: text("floor_community_slug"),
   roomBookingId: text("room_booking_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -67,7 +70,7 @@ export const events = pgTable("events", {
 export const eventHosts = pgTable("event_hosts", {
   id: uuid("id").primaryKey().defaultRandom(),
   eventId: uuid("event_id").notNull().references(() => events.id),
-  walletAddress: text("wallet_address").notNull().references(() => users.walletAddress),
+  userId: uuid("user_id").notNull().references(() => users.id),
   addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -98,7 +101,7 @@ export const contacts = pgTable(
     email: text("email").notNull(),
     firstName: text("first_name"),
     lastName: text("last_name"),
-    walletAddress: text("wallet_address").references(() => users.walletAddress),
+    walletAddress: text("wallet_address"),
     source: text("source"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

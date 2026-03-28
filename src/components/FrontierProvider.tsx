@@ -9,6 +9,7 @@ import {
 } from "react";
 
 interface FrontierContextValue {
+  userId: string | null;
   walletAddress: string | null;
   email: string | null;
   firstName: string | null;
@@ -27,6 +28,7 @@ interface FrontierContextValue {
 }
 
 const FrontierContext = createContext<FrontierContextValue>({
+  userId: null,
   walletAddress: null,
   email: null,
   firstName: null,
@@ -48,6 +50,20 @@ export function useFrontier() {
   return useContext(FrontierContext);
 }
 
+/** Decode a JWT payload without verification (client-side display only). */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    // Check expiration
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthGuard({
   requiredRole,
   children,
@@ -55,7 +71,7 @@ export function AuthGuard({
   requiredRole?: "admin" | "host";
   children: ReactNode;
 }) {
-  const { isAdmin, isHost, isLoading, walletAddress } = useFrontier();
+  const { isAdmin, isHost, isLoading, userId } = useFrontier();
 
   if (isLoading) {
     return (
@@ -65,12 +81,18 @@ export function AuthGuard({
     );
   }
 
-  if (!walletAddress) {
+  if (!userId) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-xl font-semibold text-white mb-2">Access Denied</p>
-          <p className="text-slate-400">Please open in Frontier Wallet to continue.</p>
+          <p className="text-xl font-semibold text-white mb-2">Sign In Required</p>
+          <p className="text-slate-400 mb-4">Please sign in to access this page.</p>
+          <a
+            href="/login"
+            className="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
+          >
+            Sign In
+          </a>
         </div>
       </div>
     );
@@ -103,6 +125,7 @@ export function AuthGuard({
 
 export function FrontierProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{
+    userId: string | null;
     walletAddress: string | null;
     email: string | null;
     firstName: string | null;
@@ -114,8 +137,8 @@ export function FrontierProvider({ children }: { children: ReactNode }) {
     isLoading: boolean;
     sdk: unknown | null;
     showNewsletterModal: boolean;
-    notInFrontier: boolean;
   }>({
+    userId: null,
     walletAddress: null,
     email: null,
     firstName: null,
@@ -127,7 +150,6 @@ export function FrontierProvider({ children }: { children: ReactNode }) {
     isLoading: true,
     sdk: null,
     showNewsletterModal: false,
-    notInFrontier: false,
   });
 
   useEffect(() => {
@@ -137,86 +159,95 @@ export function FrontierProvider({ children }: { children: ReactNode }) {
           "@frontiertower/frontier-sdk"
         );
 
-        if (!isInFrontierApp()) {
-          setState((s) => ({ ...s, isLoading: false, notInFrontier: true }));
+        if (isInFrontierApp()) {
+          // ── Frontier wallet flow ──
+          const sdk = new FrontierSDK();
+
+          const [accessControls, profile, address] = await Promise.all([
+            sdk.getUser().getVerifiedAccessControls(),
+            sdk.getUser().getProfile(),
+            sdk.getWallet().getAddress(),
+          ]);
+
+          const res = await fetch("/api/auth/frontier", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              verifiedAccessPayload: accessControls,
+              walletAddress: address,
+              profile: {
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                avatarUrl: profile.profilePicture,
+              },
+            }),
+          });
+
+          if (!res.ok) {
+            console.error("Auth failed:", await res.text());
+            setState((s) => ({ ...s, isLoading: false }));
+            return;
+          }
+
+          const data = await res.json();
+
+          // Store JWT
+          sessionStorage.setItem("frontier_token", data.token);
+          document.cookie = `frontier_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+
+          setState({
+            userId: data.user.id,
+            walletAddress: data.user.walletAddress,
+            email: data.user.email,
+            firstName: data.user.firstName,
+            lastName: data.user.lastName,
+            role: data.user.role,
+            communities: accessControls.communities ?? [],
+            subscriptionStatus: accessControls.subscriptionStatus ?? null,
+            newsletterOptIn: data.user.newsletterOptIn,
+            isLoading: false,
+            sdk,
+            showNewsletterModal: data.isNewUser,
+          });
           return;
         }
-
-        const sdk = new FrontierSDK();
-
-        const [accessControls, profile, address] = await Promise.all([
-          sdk.getUser().getVerifiedAccessControls(),
-          sdk.getUser().getProfile(),
-          sdk.getWallet().getAddress(),
-        ]);
-
-        const res = await fetch("/api/auth/frontier", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            verifiedAccessPayload: accessControls,
-            walletAddress: address,
-            profile: {
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              avatarUrl: profile.profilePicture,
-            },
-          }),
-        });
-
-        if (!res.ok) {
-          console.error("Auth failed:", await res.text());
-          setState((s) => ({ ...s, isLoading: false }));
-          return;
-        }
-
-        const data = await res.json();
-
-        // Store JWT
-        sessionStorage.setItem("frontier_token", data.token);
-        document.cookie = `frontier_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
-
-        setState({
-          walletAddress: data.user.walletAddress,
-          email: data.user.email,
-          firstName: data.user.firstName,
-          lastName: data.user.lastName,
-          role: data.user.role,
-          communities: accessControls.communities ?? [],
-          subscriptionStatus: accessControls.subscriptionStatus ?? null,
-          newsletterOptIn: data.user.newsletterOptIn,
-          isLoading: false,
-          sdk,
-          showNewsletterModal: data.isNewUser,
-          notInFrontier: false,
-        });
       } catch (error) {
-        console.error("Frontier SDK init error:", error);
-        setState((s) => ({ ...s, isLoading: false }));
+        // Frontier SDK not available — continue to JWT check
+        console.debug("Frontier SDK not available:", error);
       }
+
+      // ── Non-Frontier flow: try existing JWT ──
+      const token = sessionStorage.getItem("frontier_token");
+      if (token) {
+        const payload = decodeJwtPayload(token);
+        if (payload) {
+          setState({
+            userId: (payload.sub as string) ?? null,
+            walletAddress: (payload.walletAddress as string) ?? null,
+            email: (payload.email as string) ?? null,
+            firstName: (payload.firstName as string) ?? null,
+            lastName: (payload.lastName as string) ?? null,
+            role: (payload.role as string) ?? null,
+            communities: (payload.communities as string[]) ?? [],
+            subscriptionStatus: (payload.subscriptionStatus as string) ?? null,
+            newsletterOptIn: false,
+            isLoading: false,
+            sdk: null,
+            showNewsletterModal: false,
+          });
+          return;
+        }
+        // Token expired or invalid — clear it
+        sessionStorage.removeItem("frontier_token");
+        document.cookie = "frontier_token=; path=/; max-age=0";
+      }
+
+      // ── Anonymous visitor ──
+      setState((s) => ({ ...s, isLoading: false }));
     }
 
     init();
   }, []);
-
-  if (state.notInFrontier) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-white mb-4">Frontier Events</h1>
-          <p className="text-slate-400 mb-6">
-            Open in Frontier Wallet at{" "}
-            <a
-              href="https://os.frontiertower.io"
-              className="text-[#764AE2] hover:underline"
-            >
-              os.frontiertower.io
-            </a>
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const isAdmin = state.role === "admin";
   const isHost = state.role === "host" || isAdmin;
@@ -224,6 +255,7 @@ export function FrontierProvider({ children }: { children: ReactNode }) {
   return (
     <FrontierContext.Provider
       value={{
+        userId: state.userId,
         walletAddress: state.walletAddress,
         email: state.email,
         firstName: state.firstName,

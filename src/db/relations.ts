@@ -1,13 +1,20 @@
 import { relations } from "drizzle-orm";
 import {
+  users,
   organizations,
   events,
+  eventHosts,
   ticketTypes,
   contacts,
   orders,
   tickets,
   checkinLog,
 } from "./schema";
+
+export const usersRelations = relations(users, ({ many }) => ({
+  hostedEvents: many(events),
+  eventHosts: many(eventHosts),
+}));
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   events: many(events),
@@ -20,10 +27,26 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     fields: [events.orgId],
     references: [organizations.id],
   }),
+  host: one(users, {
+    fields: [events.hostUserId],
+    references: [users.id],
+  }),
+  eventHosts: many(eventHosts),
   ticketTypes: many(ticketTypes),
   tickets: many(tickets),
   orders: many(orders),
   checkinLogs: many(checkinLog),
+}));
+
+export const eventHostsRelations = relations(eventHosts, ({ one }) => ({
+  event: one(events, {
+    fields: [eventHosts.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventHosts.userId],
+    references: [users.id],
+  }),
 }));
 
 export const ticketTypesRelations = relations(ticketTypes, ({ one, many }) => ({

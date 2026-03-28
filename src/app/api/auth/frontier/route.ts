@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       role = "admin";
     }
 
-    // Check if user exists
+    // Check if user exists by wallet address
     const existing = await db.query.users.findFirst({
       where: eq(users.walletAddress, walletAddress),
     });
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           lastSeenAt: now,
           updatedAt: now,
         })
-        .where(eq(users.walletAddress, walletAddress));
+        .where(eq(users.id, existing.id));
     } else {
       await db.insert(users).values({
         walletAddress,
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
         firstName: profile?.firstName ?? null,
         lastName: profile?.lastName ?? null,
         avatarUrl: profile?.avatarUrl ?? null,
+        authProvider: "frontier",
         subscriptionPlan: subscriptionPlan ?? null,
         subscriptionStatus: subscriptionStatus ?? null,
         communities: communities ?? [],
@@ -85,14 +86,17 @@ export async function POST(req: NextRequest) {
       where: eq(users.walletAddress, walletAddress),
     });
 
-    // Issue JWT (24h)
+    // Issue JWT (24h) — use userId (uuid) as sub claim
     const token = await new SignJWT({
       walletAddress,
       email,
+      firstName: user!.firstName,
+      lastName: user!.lastName,
       role,
       communities: communities ?? [],
       subscriptionStatus: subscriptionStatus ?? null,
     })
+      .setSubject(user!.id)
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("24h")
@@ -102,6 +106,7 @@ export async function POST(req: NextRequest) {
       token,
       isNewUser,
       user: {
+        id: user!.id,
         walletAddress: user!.walletAddress,
         email: user!.email,
         firstName: user!.firstName,

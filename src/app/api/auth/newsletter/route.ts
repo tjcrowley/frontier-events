@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, contacts, organizations } from "@/db/schema";
+import { users, contacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { jwtVerify } from "jose";
 
@@ -15,7 +15,11 @@ export async function POST(req: NextRequest) {
 
     const token = authHeader.slice(7);
     const { payload } = await jwtVerify(token, secret);
-    const walletAddress = payload.walletAddress as string;
+    const userId = payload.sub as string;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = await req.json();
     const { optIn } = body;
@@ -29,15 +33,14 @@ export async function POST(req: NextRequest) {
         newsletterOptInAt: optIn ? now : null,
         updatedAt: now,
       })
-      .where(eq(users.walletAddress, walletAddress));
+      .where(eq(users.id, userId));
 
     if (optIn) {
       const user = await db.query.users.findFirst({
-        where: eq(users.walletAddress, walletAddress),
+        where: eq(users.id, userId),
       });
 
       if (user) {
-        // Get an org to associate the contact with
         const org = await db.query.organizations.findFirst();
         const orgId = org?.id ?? process.env.DEFAULT_ORG_ID ?? "00000000-0000-0000-0000-000000000000";
 
@@ -51,8 +54,8 @@ export async function POST(req: NextRequest) {
             .set({
               firstName: user.firstName,
               lastName: user.lastName,
-              walletAddress,
-              source: "frontier-wallet",
+              walletAddress: user.walletAddress,
+              source: user.authProvider === "frontier" ? "frontier-wallet" : "email-signup",
               updatedAt: now,
             })
             .where(eq(contacts.id, existingContact.id));
@@ -62,8 +65,8 @@ export async function POST(req: NextRequest) {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            walletAddress,
-            source: "frontier-wallet",
+            walletAddress: user.walletAddress,
+            source: user.authProvider === "frontier" ? "frontier-wallet" : "email-signup",
           });
         }
       }

@@ -1,6 +1,9 @@
 import sgMail from "@sendgrid/mail";
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+// Only set API key if it looks real — allows dev to run without SendGrid configured
+if (process.env.SENDGRID_API_KEY?.startsWith("SG.")) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 interface TicketInfo {
   attendeeName: string;
@@ -125,6 +128,10 @@ export async function sendOrderConfirmation({
     </div>
   `;
 
+  if (!process.env.SENDGRID_API_KEY?.startsWith("SG.")) {
+    console.log(`[email stub] Would send order confirmation to ${contact.email} for ${event.name}`);
+    return;
+  }
   await sgMail.send({
     from: process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io",
     to: contact.email,
@@ -137,6 +144,10 @@ export async function sendNewsletterWelcome(
   email: string,
   firstName: string
 ): Promise<void> {
+  if (!process.env.SENDGRID_API_KEY?.startsWith("SG.")) {
+    console.log(`[email stub] Would send newsletter welcome to ${email}`);
+    return;
+  }
   await sgMail.send({
     from: process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io",
     to: email,

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { db } from "@/lib/db";
-import { events, ticketTypes, tickets } from "@/lib/db/schema";
-import { eq, and, gt, sql, count } from "drizzle-orm";
+import { db } from "@/db";
+import { events } from "@/db/schema";
+import { eq, and, gt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -59,8 +59,8 @@ export default async function HomePage() {
               const minPrice = event.ticketTypes.length
                 ? Math.min(...event.ticketTypes.map((t) => t.priceCents))
                 : null;
-              const totalCapacity = event.ticketTypes.reduce(
-                (sum, t) => sum + (t.capacity ?? 0),
+              const totalQuantity = event.ticketTypes.reduce(
+                (sum, t) => sum + (t.quantity ?? 0),
                 0
               );
 
@@ -74,7 +74,7 @@ export default async function HomePage() {
                     <div className="aspect-video bg-slate-700 overflow-hidden">
                       <img
                         src={event.coverImageUrl}
-                        alt={event.name}
+                        alt={event.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -85,7 +85,7 @@ export default async function HomePage() {
                   )}
                   <div className="p-4">
                     <h2 className="font-semibold text-lg text-white group-hover:text-indigo-400 transition-colors">
-                      {event.name}
+                      {event.title}
                     </h2>
                     <p className="text-sm text-slate-400 mt-1">
                       {formatDate(event.startsAt)}
@@ -99,9 +99,9 @@ export default async function HomePage() {
                           ? `From $${(minPrice / 100).toFixed(2)}`
                           : ""}
                       </span>
-                      {totalCapacity > 0 && (
+                      {totalQuantity > 0 && (
                         <span className="text-xs text-slate-500">
-                          {totalCapacity} spots
+                          {totalQuantity} spots
                         </span>
                       )}
                     </div>

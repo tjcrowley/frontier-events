@@ -2,8 +2,8 @@ import { randomBytes } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import QRCode from "qrcode";
-import { db } from "@/lib/db";
-import { tickets } from "@/lib/db/schema";
+import { db } from "@/db";
+import { tickets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0, O, 1, I, L

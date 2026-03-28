@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { FrontierProvider } from "@/components/FrontierProvider";
+import { NewsletterModal } from "@/components/NewsletterModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +30,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-slate-900 text-white font-sans">
-        {children}
+        <FrontierProvider>
+          <NewsletterModal />
+          {children}
+        </FrontierProvider>
       </body>
     </html>
   );

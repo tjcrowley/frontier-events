@@ -1,6 +1,6 @@
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 interface TicketInfo {
   attendeeName: string;
@@ -125,10 +125,33 @@ export async function sendOrderConfirmation({
     </div>
   `;
 
-  await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Frontier Events <events@frontier.tower>",
+  await sgMail.send({
+    from: process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io",
     to: contact.email,
     subject: `Your tickets for ${event.name}`,
     html,
+  });
+}
+
+export async function sendNewsletterWelcome(
+  email: string,
+  firstName: string
+): Promise<void> {
+  await sgMail.send({
+    from: process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io",
+    to: email,
+    subject: "Welcome to Frontier Events!",
+    html: `
+      <div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
+        <div style="background:#0A0A0A;padding:24px;text-align:center;">
+          <h1 style="color:#fff;margin:0;font-size:20px;">Frontier Events</h1>
+        </div>
+        <div style="padding:32px 24px;">
+          <h2>Hey ${firstName}! 👋</h2>
+          <p>You're now subscribed to Frontier Tower event updates. We'll let you know when new events are posted.</p>
+          <p style="color:#666;font-size:14px;">You can unsubscribe anytime from your account settings.</p>
+        </div>
+      </div>
+    `,
   });
 }

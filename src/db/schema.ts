@@ -9,6 +9,24 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+// ── Users ───────────────────────────────────────────────────────────────
+export const users = pgTable("users", {
+  walletAddress: text("wallet_address").primaryKey(),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  avatarUrl: text("avatar_url"),
+  subscriptionPlan: text("subscription_plan"),
+  subscriptionStatus: text("subscription_status"),
+  communities: text("communities").array(),
+  role: text("role").notNull().default("member"),
+  newsletterOptIn: boolean("newsletter_opt_in").notNull().default(false),
+  newsletterOptInAt: timestamp("newsletter_opt_in_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Organizations ──────────────────────────────────────────────────────────
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -34,12 +52,23 @@ export const events = pgTable("events", {
   status: text("status").notNull().default("draft"),
   visibility: text("visibility").notNull().default("public"),
   capacity: integer("capacity"),
+  hostWalletAddress: text("host_wallet_address").references(() => users.walletAddress),
+  floorCommunitySlug: text("floor_community_slug"),
+  roomBookingId: text("room_booking_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// ── Event Hosts ─────────────────────────────────────────────────────────
+export const eventHosts = pgTable("event_hosts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  walletAddress: text("wallet_address").notNull().references(() => users.walletAddress),
+  addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ── Ticket Types ───────────────────────────────────────────────────────────
@@ -69,6 +98,7 @@ export const contacts = pgTable(
     email: text("email").notNull(),
     firstName: text("first_name"),
     lastName: text("last_name"),
+    walletAddress: text("wallet_address").references(() => users.walletAddress),
     source: text("source"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

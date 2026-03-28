@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
-import { db } from "@/lib/db";
-import { orders, tickets, contacts, events } from "@/lib/db/schema";
+import { db } from "@/db";
+import { orders, tickets, contacts, events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createTicketsForOrder } from "@/lib/tickets";
 import { sendOrderConfirmation } from "@/lib/email";
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       .set({
         status: "completed",
         stripePaymentIntentId: session.payment_intent as string,
-        paidAt: new Date(),
+        completedAt: new Date(),
       })
       .where(eq(orders.id, orderId));
 
@@ -74,13 +74,13 @@ export async function POST(req: NextRequest) {
       await sendOrderConfirmation({
         order,
         tickets: orderTickets.map((t) => ({
-          attendeeName: t.attendeeName,
+          attendeeName: t.attendeeName ?? "",
           ticketTypeName: t.ticketType.name,
           code: t.code!,
           qrUrl: t.qrUrl!,
         })),
-        contact,
-        event: eventRecord,
+        contact: { ...contact, firstName: contact.firstName ?? "", lastName: contact.lastName ?? "" },
+        event: { name: eventRecord.title, date: eventRecord.startsAt, endDate: eventRecord.endsAt, location: eventRecord.location ?? "", slug: eventRecord.slug },
       });
     }
   }

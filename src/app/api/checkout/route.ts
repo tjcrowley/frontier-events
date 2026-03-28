@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { events, ticketTypes, contacts, orders, tickets } from "@/lib/db/schema";
+import { randomBytes } from "crypto";
+import { db } from "@/db";
+import { events, ticketTypes, contacts, orders, tickets, organizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+
+const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function generateTicketCode(): string {
+  const bytes = randomBytes(6);
+  let code = "FT-";
+  for (let i = 0; i < 6; i++) code += ALPHABET[bytes[i] % ALPHABET.length];
+  return code;
+}
 import { stripe } from "@/lib/stripe";
 import { createTicketsForOrder } from "@/lib/tickets";
 import { sendOrderConfirmation } from "@/lib/email";
@@ -54,6 +63,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Create/upsert contact
+    // Resolve orgId from the event's org (fallback to first org)
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, event.orgId),
+    });
+    const orgId = org?.id ?? event.orgId;
+
     const existingContact = await db.query.contacts.findFirst({
       where: eq(contacts.email, contact.email),
     });
@@ -69,6 +84,7 @@ export async function POST(req: NextRequest) {
       const [newContact] = await db
         .insert(contacts)
         .values({
+          orgId,
           email: contact.email,
           firstName: contact.firstName,
           lastName: contact.lastName,
@@ -81,6 +97,7 @@ export async function POST(req: NextRequest) {
     const [order] = await db
       .insert(orders)
       .values({
+        orgId,
         eventId,
         contactId,
         totalCents,
@@ -88,12 +105,15 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    // Create ticket rows (without codes yet)
+    // Create ticket rows (without codes yet for paid, with codes for free)
     for (const item of lineItems) {
       for (let i = 0; i < item.quantity; i++) {
         await db.insert(tickets).values({
           orderId: order.id,
           ticketTypeId: item.typeId,
+          eventId,
+          contactId,
+          code: generateTicketCode(),
           attendeeName: item.attendeeName,
           attendeeEmail: item.attendeeEmail,
           status: "pending",
@@ -117,13 +137,13 @@ export async function POST(req: NextRequest) {
       await sendOrderConfirmation({
         order,
         tickets: orderTickets.map((t) => ({
-          attendeeName: t.attendeeName,
+          attendeeName: t.attendeeName ?? "",
           ticketTypeName: t.ticketType.name,
           code: t.code!,
           qrUrl: t.qrUrl!,
         })),
-        contact: contactRecord,
-        event,
+        contact: { ...contactRecord, firstName: contactRecord.firstName ?? "", lastName: contactRecord.lastName ?? "" },
+        event: { name: event.title, date: event.startsAt, endDate: event.endsAt, location: event.location ?? "", slug: event.slug },
       });
 
       return NextResponse.json({
@@ -133,7 +153,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Paid event — create Stripe Checkout Session
-    const platformFeeBps = event.platformFeeBps ?? 0;
+    const platformFeeBps = org?.platformFeeBps ?? 0;
     const applicationFeeAmount = Math.round((platformFeeBps / 10000) * totalCents);
 
     const session = await stripe.checkout.sessions.create({
@@ -143,7 +163,7 @@ export async function POST(req: NextRequest) {
           currency: "usd",
           product_data: {
             name: item.type.name,
-            description: `${event.name} — ${item.type.name}`,
+            description: `${event.title} — ${item.type.name}`,
           },
           unit_amount: item.type.priceCents,
         },
@@ -166,7 +186,7 @@ export async function POST(req: NextRequest) {
     // Store Stripe session ID on the order
     await db
       .update(orders)
-      .set({ stripeSessionId: session.id })
+      .set({ stripeCheckoutSessionId: session.id })
       .where(eq(orders.id, order.id));
 
     // 5. Return session info

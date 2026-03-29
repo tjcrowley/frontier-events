@@ -167,6 +167,36 @@ export const tickets = pgTable("tickets", {
     .defaultNow(),
 });
 
+// ── RSVPs ─────────────────────────────────────────────────────────────────
+export const rsvps = pgTable("rsvps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  userId: uuid("user_id").references(() => users.id),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  status: text("status").notNull().default("going"),  // "going" | "maybe" | "not_going"
+  source: text("source").notNull().default("rsvp"),   // "rsvp" | "ticket"
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("rsvps_event_email_idx").on(table.eventId, table.email),
+]);
+
+// ── Event Messages ────────────────────────────────────────────────────────
+export const eventMessages = pgTable("event_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  senderUserId: uuid("sender_user_id").references(() => users.id),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  recipientFilter: text("recipient_filter").notNull().default("all"), // "all" | "going" | "tickets_only"
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  recipientCount: integer("recipient_count"),
+  status: text("status").notNull().default("draft"), // "draft" | "sent" | "failed"
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Check-in Log ───────────────────────────────────────────────────────────
 export const checkinLog = pgTable("checkin_log", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { db } from "@/db";
-import { events, ticketTypes, contacts, orders, tickets, organizations } from "@/db/schema";
+import { events, ticketTypes, contacts, orders, tickets, organizations, rsvps } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -145,6 +145,19 @@ export async function POST(req: NextRequest) {
         contact: { ...contactRecord, firstName: contactRecord.firstName ?? "", lastName: contactRecord.lastName ?? "" },
         event: { name: event.title, date: event.startsAt, endDate: event.endsAt, location: event.location ?? "", slug: event.slug },
       });
+
+      // Sync ticket holder as RSVP
+      await db
+        .insert(rsvps)
+        .values({
+          eventId,
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          status: "going",
+          source: "ticket",
+        })
+        .onConflictDoNothing();
 
       return NextResponse.json({
         orderId: order.id,

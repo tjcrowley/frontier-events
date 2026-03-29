@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { orders, tickets, contacts, events } from "@/db/schema";
+import { orders, tickets, contacts, events, rsvps } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createTicketsForOrder } from "@/lib/tickets";
 import { sendOrderConfirmation } from "@/lib/email";
@@ -71,6 +71,19 @@ export async function POST(req: NextRequest) {
     });
 
     if (order && contact && eventRecord) {
+      // Sync ticket holder as RSVP
+      await db
+        .insert(rsvps)
+        .values({
+          eventId: order.eventId,
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          status: "going",
+          source: "ticket",
+        })
+        .onConflictDoNothing();
+
       await sendOrderConfirmation({
         order,
         tickets: orderTickets.map((t) => ({

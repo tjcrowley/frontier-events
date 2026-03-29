@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { EventMessaging } from "@/components/EventMessaging";
 
 interface TicketType {
   id: string;
@@ -48,6 +49,11 @@ export default function EditEventPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // RSVP counts
+  const [rsvpCounts, setRsvpCounts] = useState<{ going: number; maybe: number; ticketHolders: number; total: number } | null>(null);
+  // Messages
+  const [messages, setMessages] = useState<Array<{ id: string; subject: string; body: string; recipientFilter: string; recipientCount: number | null; status: string; sentAt: string | null; createdAt: string }>>([]);
+
   // Ticket type form
   const [newTicketType, setNewTicketType] = useState({
     name: "",
@@ -74,6 +80,18 @@ export default function EditEventPage() {
           visibility: data.visibility ?? "public",
         });
         setLoading(false);
+
+        // Fetch RSVP counts
+        fetch(`/api/events/${data.slug}/rsvp`)
+          .then((r) => r.json())
+          .then(setRsvpCounts)
+          .catch(() => {});
+
+        // Fetch messages
+        fetch(`/api/admin/events/${id}/messages`)
+          .then((r) => r.json())
+          .then(setMessages)
+          .catch(() => {});
       })
       .catch(() => {
         setError("Failed to load event");
@@ -217,6 +235,25 @@ export default function EditEventPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
+        {/* RSVP Summary */}
+        {rsvpCounts && (rsvpCounts.going > 0 || rsvpCounts.maybe > 0 || rsvpCounts.ticketHolders > 0) && (
+          <div className="flex gap-4 text-sm">
+            <span className="rounded-full bg-green-900/30 text-green-400 px-3 py-1">
+              {rsvpCounts.going + rsvpCounts.ticketHolders} going
+            </span>
+            {rsvpCounts.maybe > 0 && (
+              <span className="rounded-full bg-yellow-900/30 text-yellow-400 px-3 py-1">
+                {rsvpCounts.maybe} maybe
+              </span>
+            )}
+            {rsvpCounts.ticketHolders > 0 && (
+              <span className="rounded-full bg-indigo-900/30 text-indigo-400 px-3 py-1">
+                {rsvpCounts.ticketHolders} tickets
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Event Form */}
         <section>
           <h1 className="text-2xl font-bold mb-6">Edit Event</h1>
@@ -420,6 +457,9 @@ export default function EditEventPage() {
             </button>
           </form>
         </section>
+
+        {/* Event Messaging */}
+        <EventMessaging eventId={id} initialMessages={messages} />
       </main>
     </div>
   );

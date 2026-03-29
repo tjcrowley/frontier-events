@@ -140,6 +140,41 @@ export async function sendOrderConfirmation({
   });
 }
 
+export async function sendEventMessage(params: {
+  recipients: { email: string; firstName?: string | null }[];
+  event: { title: string; slug: string };
+  message: { subject: string; body: string };
+}): Promise<void> {
+  if (!process.env.SENDGRID_API_KEY?.startsWith("SG.")) {
+    console.log(`[email stub] Would send "${params.message.subject}" to ${params.recipients.length} recipients for event "${params.event.title}"`);
+    params.recipients.forEach(r => console.log(`  -> ${r.email}`));
+    return;
+  }
+  const from = process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io";
+  for (const recipient of params.recipients) {
+    const greeting = recipient.firstName ? `Hi ${recipient.firstName},` : "Hi,";
+    await sgMail.send({
+      from,
+      to: recipient.email,
+      subject: params.message.subject,
+      html: `
+        <div style="max-width:600px;margin:0 auto;font-family:-apple-system,sans-serif;color:#1a1a1a;">
+          <div style="background:#0A0A0A;padding:20px;text-align:center;">
+            <h2 style="color:#fff;margin:0;font-size:18px;">${params.event.title}</h2>
+          </div>
+          <div style="padding:28px 24px;">
+            <p>${greeting}</p>
+            ${params.message.body.split("\n").map(p => `<p>${p}</p>`).join("")}
+          </div>
+          <div style="background:#f5f5f5;padding:12px 24px;font-size:12px;color:#999;text-align:center;">
+            You are receiving this because you RSVPd or have a ticket to ${params.event.title}.
+          </div>
+        </div>
+      `,
+    });
+  }
+}
+
 export async function sendNewsletterWelcome(
   email: string,
   firstName: string

@@ -9,11 +9,14 @@ import {
   orders,
   tickets,
   checkinLog,
+  rsvps,
+  eventMessages,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
   hostedEvents: many(events),
   eventHosts: many(eventHosts),
+  rsvps: many(rsvps),
 }));
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -36,6 +39,8 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   tickets: many(tickets),
   orders: many(orders),
   checkinLogs: many(checkinLog),
+  rsvps: many(rsvps),
+  eventMessages: many(eventMessages),
 }));
 
 export const eventHostsRelations = relations(eventHosts, ({ one }) => ({
@@ -98,6 +103,28 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
   event: one(events, {
     fields: [tickets.eventId],
     references: [events.id],
+  }),
+}));
+
+export const rsvpsRelations = relations(rsvps, ({ one }) => ({
+  event: one(events, {
+    fields: [rsvps.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [rsvps.userId],
+    references: [users.id],
+  }),
+}));
+
+export const eventMessagesRelations = relations(eventMessages, ({ one }) => ({
+  event: one(events, {
+    fields: [eventMessages.eventId],
+    references: [events.id],
+  }),
+  sender: one(users, {
+    fields: [eventMessages.senderUserId],
+    references: [users.id],
   }),
 }));
 

@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { db } from "@/db";
-import { events } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { events, rsvps, orders, contacts } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { NavBar } from "@/components/NavBar";
+import { RSVPButtons } from "@/components/RSVPButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,36 @@ export default async function EventPage({ params }: Props) {
     );
   }
 
+  // Fetch RSVP counts
+  const rsvpCounts = await db
+    .select({
+      status: rsvps.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(rsvps)
+    .where(and(eq(rsvps.eventId, event.id), eq(rsvps.source, "rsvp")))
+    .groupBy(rsvps.status);
+
+  const ticketHolderResult = await db
+    .select({
+      count: sql<number>`count(distinct ${contacts.email})::int`,
+    })
+    .from(orders)
+    .innerJoin(contacts, eq(orders.contactId, contacts.id))
+    .where(and(eq(orders.eventId, event.id), eq(orders.status, "completed")));
+
+  const ticketRsvpCount = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(rsvps)
+    .where(and(eq(rsvps.eventId, event.id), eq(rsvps.source, "ticket")));
+
+  const goingCount = rsvpCounts.find((r) => r.status === "going")?.count ?? 0;
+  const maybeCount = rsvpCounts.find((r) => r.status === "maybe")?.count ?? 0;
+  const ticketHolders = ticketHolderResult[0]?.count ?? 0;
+  const totalCount = goingCount + ticketHolders - (ticketRsvpCount[0]?.count ?? 0) + maybeCount;
+
+  const initialCounts = { going: goingCount, maybe: maybeCount, ticketHolders, total: totalCount };
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   const jsonLd = {
@@ -209,6 +240,12 @@ export default async function EventPage({ params }: Props) {
 
           <div className="lg:col-span-1">
             <div className="sticky top-8 rounded-lg border border-slate-700 bg-slate-800/50 p-6">
+              <RSVPButtons
+                eventSlug={event.slug}
+                eventId={event.id}
+                initialCounts={initialCounts}
+              />
+
               <h2 className="font-semibold text-lg mb-4">Tickets</h2>
 
               {event.ticketTypes.length === 0 ? (

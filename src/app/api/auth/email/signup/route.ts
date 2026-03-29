@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
       role: user.role,
       communities: [],
       subscriptionStatus: null,
+      authProvider: "email",
     })
       .setSubject(user.id)
       .setProtectedHeader({ alg: "HS256" })

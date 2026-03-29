@@ -12,9 +12,14 @@ async function getUser() {
 
   try {
     const { payload } = await jwtVerify(token, secret);
+    const isCitizen =
+      payload.authProvider === "frontier" &&
+      payload.walletAddress != null &&
+      payload.subscriptionStatus === "active";
     return {
       firstName: payload.firstName as string | null,
       role: payload.role as string,
+      isCitizen: isCitizen || payload.role === "admin",
     };
   } catch {
     return null;
@@ -43,6 +48,14 @@ export async function NavBar() {
         <nav className="flex items-center gap-1 text-sm">
           {user ? (
             <>
+              {user.isCitizen && (
+                <Link
+                  href="/events/new"
+                  className="px-3 py-1.5 text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/5 text-sm hidden sm:block"
+                >
+                  + Host Event
+                </Link>
+              )}
               {user.role === "admin" && (
                 <Link
                   href="/admin"

@@ -10,6 +10,7 @@ interface JWTPayload {
   role: string;
   communities: string[];
   subscriptionStatus: string | null;
+  authProvider?: string; // "frontier" | "email"
 }
 
 async function getPayload(req: NextRequest): Promise<JWTPayload | null> {
@@ -32,6 +33,15 @@ async function getPayload(req: NextRequest): Promise<JWTPayload | null> {
   }
 }
 
+/** Frontier citizen = authed via Frontier SDK with an active subscription */
+function isFrontierCitizen(payload: JWTPayload): boolean {
+  return (
+    payload.authProvider === "frontier" &&
+    payload.walletAddress != null &&
+    payload.subscriptionStatus === "active"
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isApiRoute = pathname.startsWith("/api/");
@@ -40,32 +50,36 @@ export async function middleware(req: NextRequest) {
   // Admin routes
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (!payload) {
-      if (isApiRoute) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+      if (isApiRoute) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       return NextResponse.redirect(new URL("/login", req.url));
     }
     if (payload.role !== "admin") {
-      if (isApiRoute) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      return NextResponse.redirect(new URL("/login", req.url));
+      if (isApiRoute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.redirect(new URL("/auth-required", req.url));
     }
   }
 
   // Scanner and check-in routes: host or admin
   if (pathname === "/scanner" || pathname.startsWith("/api/check-in")) {
     if (!payload) {
-      if (isApiRoute) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+      if (isApiRoute) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       return NextResponse.redirect(new URL("/login", req.url));
     }
     if (payload.role !== "admin" && payload.role !== "host") {
-      if (isApiRoute) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+      if (isApiRoute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.redirect(new URL("/auth-required", req.url));
+    }
+  }
+
+  // Event creation: Frontier citizens only (active subscription + wallet auth)
+  if (pathname === "/events/new" || pathname.startsWith("/api/events/create")) {
+    if (!payload) {
+      if (isApiRoute) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       return NextResponse.redirect(new URL("/login", req.url));
+    }
+    if (!isFrontierCitizen(payload) && payload.role !== "admin") {
+      if (isApiRoute) return NextResponse.json({ error: "Frontier citizens only" }, { status: 403 });
+      return NextResponse.redirect(new URL("/citizens-only", req.url));
     }
   }
 
@@ -83,6 +97,7 @@ export async function middleware(req: NextRequest) {
     response.headers.set("x-wallet-address", payload.walletAddress ?? "");
     response.headers.set("x-user-role", payload.role);
     response.headers.set("x-user-email", payload.email);
+    response.headers.set("x-auth-provider", payload.authProvider ?? "");
     return response;
   }
 
@@ -90,5 +105,13 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/scanner", "/account", "/api/admin/:path*", "/api/check-in/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/scanner",
+    "/account",
+    "/events/new",
+    "/api/admin/:path*",
+    "/api/check-in/:path*",
+    "/api/events/create",
+  ],
 };

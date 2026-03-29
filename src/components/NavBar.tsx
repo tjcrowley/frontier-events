@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 
@@ -24,43 +25,54 @@ export async function NavBar() {
   const user = await getUser();
 
   return (
-    <header className="border-b border-slate-800">
-      <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-white">
-          Frontier Events
+    <header className="border-b border-white/8 bg-[#0A0A0A]/90 backdrop-blur-sm sticky top-0 z-50">
+      <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Image
+            src="/logo-white.svg"
+            alt="Frontier Tower"
+            width={120}
+            height={21}
+            priority
+          />
+          <span className="text-white/30 text-xs font-medium tracking-widest uppercase ml-1 hidden sm:block">
+            Events
+          </span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+
+        <nav className="flex items-center gap-1 text-sm">
           {user ? (
             <>
-              <span className="text-slate-300">
-                {user.firstName || "Account"}
-              </span>
-              <Link
-                href="/account"
-                className="text-slate-400 hover:text-white transition-colors"
-              >
-                Account
-              </Link>
               {user.role === "admin" && (
                 <Link
                   href="/admin"
-                  className="text-slate-400 hover:text-white transition-colors"
+                  className="px-3 py-1.5 text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/5"
                 >
                   Admin
                 </Link>
               )}
+              <Link
+                href="/account"
+                className="flex items-center gap-2 px-3 py-1.5 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              >
+                <span className="w-6 h-6 rounded-full bg-[#764AE2] flex items-center justify-center text-xs font-bold text-white shrink-0">
+                  {(user.firstName?.[0] ?? "?").toUpperCase()}
+                </span>
+                <span className="hidden sm:block">{user.firstName ?? "Account"}</span>
+              </Link>
             </>
           ) : (
             <>
               <Link
                 href="/login"
-                className="text-slate-400 hover:text-white transition-colors"
+                className="px-3 py-1.5 text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/5"
               >
                 Log In
               </Link>
               <Link
                 href="/signup"
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-500 transition-colors"
+                className="px-4 py-1.5 rounded-lg font-medium text-white transition-all"
+                style={{ background: "linear-gradient(135deg, #938DEE, #764AE2)" }}
               >
                 Sign Up
               </Link>

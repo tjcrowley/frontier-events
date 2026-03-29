@@ -29,7 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-slate-900 text-white font-sans">
+      <body className="min-h-full flex flex-col bg-[#0A0A0A] text-white font-sans">
         <FrontierProvider>
           <NewsletterModal />
           {children}

@@ -3,4 +3,29 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Frontier Tower brand palette */
+  --color-ft-purple:     #764AE2;
+  --color-ft-purple-light: #938DEE;
+  --color-ft-purple-20:  #A4A7F3;
+  --color-ft-lavender:   #C2C9FA;
+  --color-ft-green:      #47B70B;
+  --color-ft-green-light: #DFFECD;
+  --color-ft-black:      #0A0A0A;
+  --color-ft-gray-70:    #2B2B2B;
+  --color-ft-gray-light: #EBEBEB;
 }
+
+/* Base */
+html, body {
+  background: #0A0A0A;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0A0A0A; }
+::-webkit-scrollbar-thumb { background: #2B2B2B; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #764AE2; }
+
+/* Selection */
+::selection { background: #764AE2; color: #fff; }

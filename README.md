@@ -1,23 +1,22 @@
 # Frontier Events
 
-Event ticketing and management platform for [Frontier Tower Makerspace](https://frontiertower.io). Built to replace Luma for internal community events.
-
-![Frontier Tower](public/logo-white.svg)
+Event ticketing and management platform for [Frontier Tower Makerspace](https://frontiertower.io). Built to replace Luma for internal community events — with Frontier OS wallet auth, citizen-only access control, and two-way Luma sync.
 
 ---
 
 ## Features
 
 - **Public event listings** — anyone can browse and RSVP to public events
-- **Citizen-only events** — members-only events visible only to authenticated Frontier Tower citizens
+- **Citizen-only events** — members-only events gated to authenticated Frontier Tower citizens
 - **Ticketing** — free and paid tickets via Stripe, QR code generation, email confirmation
-- **RSVP system** — Going / Maybe / Not Going with live attendance counts
-- **Waitlist** — automatic queue when events sell out, admin can notify next in line
+- **RSVP system** — Going / Maybe / Not Going with live attendance counts on every event page
+- **Waitlist** — automatic queue when events sell out; admin notifies next in line
 - **Recurring events** — weekly, bi-weekly, or monthly recurrence with bulk instance generation
-- **Calendar view** — month-view calendar at `/calendar` with event pills per day
-- **Email blasts** — send targeted messages to RSVPs and ticket holders from the admin panel
-- **QR check-in scanner** — camera-based scanner for hosts at the door
-- **Dual auth** — Frontier OS wallet authentication (for citizens) + standard email/password
+- **Calendar view** — month-view calendar at `/calendar` with per-day event pills
+- **Email blasts** — admin sends targeted messages to RSVPs / ticket holders from the event editor
+- **QR check-in scanner** — camera-based scanner at `/scanner` for hosts at the door
+- **Dual auth** — Frontier OS wallet auth (citizens) + standard email/password (public)
+- **Luma two-way sync** — publishing an event auto-creates it on Luma; Luma RSVPs flow back into contacts and RSVP counts automatically
 
 ---
 
@@ -30,8 +29,9 @@ Event ticketing and management platform for [Frontier Tower Makerspace](https://
 | Auth | [Frontier SDK](https://github.com/BerlinhouseLabs/frontier-sdk) + JWT (jose) + bcryptjs |
 | Payments | Stripe Checkout |
 | Email | SendGrid (`@sendgrid/mail`) |
+| Syndication | Luma API (`https://public-api.luma.com`) |
 | Styling | Tailwind CSS v4 |
-| Runtime | Node.js 24 |
+| Runtime | Node.js 20+ |
 
 ---
 
@@ -41,8 +41,6 @@ Event ticketing and management platform for [Frontier Tower Makerspace](https://
 
 - Node.js 20+
 - PostgreSQL running locally
-- (Optional) Stripe account for paid tickets
-- (Optional) SendGrid account for email
 
 ### Install
 
@@ -54,8 +52,6 @@ npm install
 
 ### Configure
 
-Copy the env template and fill in values:
-
 ```bash
 cp .env.local.example .env.local
 ```
@@ -63,17 +59,18 @@ cp .env.local.example .env.local
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `JWT_SECRET` | ✅ | Random 32+ char secret for signing JWTs |
-| `NEXT_PUBLIC_APP_URL` | ✅ | Public base URL (e.g. `https://events.frontiertower.io`) |
+| `JWT_SECRET` | ✅ | Random 32+ char secret (`openssl rand -base64 32`) |
+| `NEXT_PUBLIC_APP_URL` | ✅ | Public base URL e.g. `https://events.frontiertower.io` |
 | `STRIPE_SECRET_KEY` | Paid tickets | Stripe secret key (`sk_...`) |
 | `STRIPE_WEBHOOK_SECRET` | Paid tickets | Stripe webhook signing secret |
 | `SENDGRID_API_KEY` | Email | SendGrid API key (`SG.xxx`) |
 | `SENDGRID_FROM_EMAIL` | Email | Verified sender address |
 | `SEED_ADMIN_WALLET` | Optional | Frontier wallet address to auto-grant admin on first login |
+| `LUMA_API_KEY` | Luma sync | From Luma dashboard → Settings → API (requires Luma Plus) |
+| `LUMA_CALENDAR_ID` | Luma sync | Your org's Luma calendar ID |
+| `LUMA_WEBHOOK_SECRET` | Luma sync | From Luma dashboard → Webhooks |
 
 ### Database
-
-Create the database and run migrations:
 
 ```bash
 createdb frontier_events
@@ -86,7 +83,7 @@ DATABASE_URL=postgresql://localhost/frontier_events npm run db:migrate
 npx tsx src/db/seed.ts
 ```
 
-This creates a sample org and a demo event so you have something to look at.
+Creates a sample org and demo event.
 
 ### Run
 
@@ -102,38 +99,35 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Frontier OS (Citizens)
 
-The app is designed to run inside the [Frontier Wallet PWA](https://os.frontiertower.io) as a registered app. When opened inside the wallet:
+The app runs inside the [Frontier Wallet PWA](https://os.frontiertower.io) as a registered iframe app. On load:
 
-1. `FrontierProvider` initializes the SDK automatically
+1. `FrontierProvider` initializes the SDK
 2. `getVerifiedAccessControls()` returns a cryptographically signed identity payload
-3. Your wallet address + subscription status are verified server-side
-4. A JWT is issued and stored in `sessionStorage` + cookie
+3. Wallet address + subscription status verified server-side
+4. JWT issued and stored in `sessionStorage` + cookie
 
-**Active subscribers** (`subscriptionStatus: "active"`) get full citizen access:
-- Can view citizens-only events
-- Can create events via `/events/new` (submitted as draft, reviewed by admin)
-- `network-society` plan subscribers are automatically granted admin
+**Active subscribers** (`subscriptionStatus: "active"`) get citizen access:
+- View and RSVP to citizens-only events
+- Create events via `/events/new` (submitted as draft, reviewed by admin)
+- `network-society` plan → auto-granted admin
 
-**To register the app with Frontier OS:** contact the Frontier dev team with your app metadata and public URL. See [frontier-kickstarter](https://github.com/BerlinhouseLabs/frontier-kickstarter) for the deployment guide.
+**Non-wallet visitors** still see public events and can RSVP / buy tickets — they just can't create events or see citizens-only content.
+
+**To register with Frontier OS:** contact the Frontier dev team with your app's public URL and permissions list. See [frontier-kickstarter](https://github.com/BerlinhouseLabs/frontier-kickstarter) for the deployment guide.
 
 ### Email Auth
 
-Anyone can create an account with email + password at `/signup`. Email users can:
-- Browse and RSVP to public events
-- Purchase tickets
-- View their orders
-
-Email users **cannot** create events — that requires Frontier wallet auth.
+Anyone can sign up at `/signup` with email + password. Email users can browse public events, RSVP, and buy tickets. They cannot create events.
 
 ---
 
 ## Roles
 
-| Role | Who | Can do |
+| Role | How assigned | Capabilities |
 |---|---|---|
-| `member` | Any logged-in user | RSVP, buy tickets, view citizen events |
-| `host` | Added to `event_hosts` for a specific event | Access `/scanner` for their event |
-| `admin` | `network-society` plan OR `SEED_ADMIN_WALLET` | Everything — create/publish events, message attendees, manage waitlists |
+| `member` | Any authenticated user | RSVP, buy tickets, view citizen events |
+| `host` | Added to `event_hosts` table for a specific event | Access `/scanner` for that event |
+| `admin` | `network-society` plan OR wallet matches `SEED_ADMIN_WALLET` | Full access — publish events, message attendees, manage waitlists, approve citizen submissions |
 
 ---
 
@@ -143,24 +137,45 @@ Email users **cannot** create events — that requires Frontier wallet auth.
 draft → published → (archived)
 ```
 
-- Citizens submit events as **draft** — admins review and publish
-- Admins can publish immediately from `/admin/events/[id]`
-- Recurring events: set `recurringType` on a parent event, then use "Generate Instances" to bulk-create all future occurrences
+- **Citizens** submit events as `draft` via `/events/new` — admins review and publish
+- **Admins** can create and publish directly from `/admin/events/new`
+- On publish: event is automatically pushed to Luma (if configured)
+- **Recurring events:** set `recurringType` on a parent event, set an end date, click "Generate Instances" — all future occurrences are bulk-created
+
+---
+
+## Luma Sync
+
+Two-way integration with [Luma](https://lu.ma) (requires Luma Plus subscription).
+
+### Outbound (Frontier Events → Luma)
+- Publishing an event auto-creates it on Luma and adds it to your calendar
+- The admin event editor shows sync status (`✓ Luma` / `→ Luma`) with a manual push button
+- Event updates can be re-synced via the manual button
+
+### Inbound (Luma → Frontier Events)
+- Luma sends `guest_registered` and `guest_updated` webhooks to `/api/webhooks/luma`
+- Each Luma registrant is upserted into your contacts table
+- Their RSVP status syncs into the event's RSVP count
+
+### Setup (once you have a Luma Plus account)
+1. Get your API key: Luma dashboard → Settings → API
+2. Get your calendar ID: `curl -H "x-luma-api-key: YOUR_KEY" https://public-api.luma.com/v1/user/get-self`
+3. Add both to `.env.local`
+4. In Luma → Webhooks, add endpoint `https://events.frontiertower.io/api/webhooks/luma`, select `guest_registered` + `guest_updated`, paste signing secret as `LUMA_WEBHOOK_SECRET`
 
 ---
 
 ## Email
 
-All emails are stubbed in development (logged to console). To enable:
+All emails are console-stubbed in development. To enable, add a real `SENDGRID_API_KEY` (starts with `SG.`).
 
-1. Add a real `SENDGRID_API_KEY` (starts with `SG.`) to `.env.local`
-2. Set `SENDGRID_FROM_EMAIL` to a verified sender
-
-Emails sent:
-- **Order confirmation** — tickets + QR codes on purchase
-- **Newsletter welcome** — on opt-in
-- **Event messages** — admin-triggered blasts to RSVPs / ticket holders
-- **Waitlist notification** — when a spot opens up
+| Email | Trigger |
+|---|---|
+| Order confirmation | Ticket purchase (free or paid) |
+| Newsletter welcome | First-login opt-in |
+| Event message blast | Admin sends from event editor |
+| Waitlist notification | Admin clicks "Notify Next" |
 
 ---
 
@@ -169,71 +184,85 @@ Emails sent:
 ```
 src/
 ├── app/
-│   ├── page.tsx              # Public homepage
-│   ├── calendar/             # Month-view calendar
-│   ├── e/[slug]/             # Event detail + checkout
-│   ├── events/new/           # Citizen event creation
-│   ├── admin/                # Admin dashboard (admin only)
-│   ├── scanner/              # QR check-in (hosts + admins)
-│   ├── login/ signup/        # Email auth
-│   ├── account/              # User profile
-│   ├── citizens-only/        # Gate page for non-citizens
+│   ├── page.tsx                      # Public homepage
+│   ├── calendar/                     # Month-view calendar
+│   ├── e/[slug]/                     # Event detail + checkout
+│   ├── events/new/                   # Citizen event creation (Frontier auth required)
+│   ├── admin/                        # Admin dashboard + event management
+│   ├── scanner/                      # QR check-in (hosts + admins only)
+│   ├── login/ signup/                # Email auth
+│   ├── account/                      # User profile + newsletter toggle
+│   ├── citizens-only/                # Gate page (redirected non-citizens)
+│   ├── auth-required/                # Gate page (redirected unauthenticated)
 │   └── api/
-│       ├── auth/             # Frontier + email auth routes
-│       ├── events/           # Public event API (RSVP, waitlist)
-│       ├── admin/events/     # Admin event management
-│       ├── checkout/         # Stripe checkout
-│       └── check-in/        # Ticket validation
+│       ├── auth/frontier/            # Frontier SDK auth → JWT
+│       ├── auth/email/               # Email signup + login
+│       ├── auth/newsletter/          # Newsletter opt-in
+│       ├── events/[slug]/rsvp/       # RSVP counts + submission
+│       ├── events/[slug]/waitlist/   # Join waitlist
+│       ├── events/create/            # Citizen event creation (server-side)
+│       ├── admin/events/             # Admin event CRUD
+│       ├── admin/events/[id]/messages/      # Event messaging
+│       ├── admin/events/[id]/waitlist/      # Waitlist management
+│       ├── admin/events/[id]/generate-instances/  # Recurring event generation
+│       ├── checkout/                 # Stripe checkout
+│       ├── check-in/[code]/          # Ticket validation
+│       └── webhooks/
+│           ├── stripe/               # Stripe payment confirmation
+│           └── luma/                 # Luma RSVP sync
 ├── components/
-│   ├── FrontierProvider.tsx  # SDK context + auth
-│   ├── NavBar.tsx            # Top navigation
-│   ├── RSVPButtons.tsx       # Going/Maybe/Not Going
-│   ├── WaitlistForm.tsx      # Join waitlist
-│   ├── EventMessaging.tsx    # Admin email blast UI
-│   └── NewsletterModal.tsx   # First-login opt-in
+│   ├── FrontierProvider.tsx          # Frontier SDK context + JWT auth
+│   ├── NavBar.tsx                    # Top navigation (server component)
+│   ├── RSVPButtons.tsx               # Going/Maybe/Not Going (client)
+│   ├── WaitlistForm.tsx              # Join waitlist (client)
+│   ├── EventMessaging.tsx            # Admin email blast UI (client)
+│   └── NewsletterModal.tsx           # First-login newsletter opt-in
 ├── db/
-│   ├── schema.ts             # Drizzle table definitions
-│   ├── relations.ts          # Drizzle relations
-│   └── seed.ts               # Dev seed data
+│   ├── schema.ts                     # All Drizzle table definitions
+│   ├── relations.ts                  # Drizzle relations
+│   └── seed.ts                       # Dev seed data
 └── lib/
-    ├── email.ts              # SendGrid helpers
-    ├── stripe.ts             # Stripe client
-    ├── tickets.ts            # QR code generation
-    └── communities.ts        # Floor/community map
+    ├── email.ts                      # SendGrid (order confirmation, blasts, waitlist)
+    ├── luma.ts                       # Luma API client + webhook verification
+    ├── stripe.ts                     # Stripe client
+    ├── tickets.ts                    # QR code generation
+    └── communities.ts                # Floor/community slug map
 ```
 
 ---
 
 ## Deployment
 
-### Vercel (recommended)
+### Vercel + Neon (recommended)
 
 ```bash
+# 1. Create a Neon Postgres database at neon.tech
+# 2. Run migrations against it
+DATABASE_URL=<neon_url> npm run db:migrate
+
+# 3. Deploy
 npm i -g vercel
-vercel
+vercel --prod
 ```
 
-Set all env vars in the Vercel dashboard. Use [Neon](https://neon.tech) or [Vercel Postgres](https://vercel.com/storage/postgres) for the database.
+Set all env vars in the Vercel dashboard. Add a CNAME for `events.frontiertower.io` pointing to `cname.vercel-dns.com`.
 
-After deploy, run migrations:
-
-```bash
-DATABASE_URL=<prod_url> npm run db:migrate
-```
+After deploy, register a Stripe webhook at `https://events.frontiertower.io/api/webhooks/stripe` (event: `checkout.session.completed`).
 
 ### Other platforms
 
-Any Node.js 20+ host works. The app is a standard Next.js server — `npm run build && npm start`.
+Any Node.js 20+ host. `npm run build && npm start`.
 
 ---
 
-## Development
+## Scripts
 
 ```bash
-npm run dev          # Dev server (Turbopack)
-npm run build        # Production build
-npm run db:migrate   # Run pending migrations
-npm run db:studio    # Open Drizzle Studio (DB browser)
+npm run dev          # Dev server with Turbopack
+npm run build        # Production build + type check
+npm run db:migrate   # Apply pending migrations
+npm run db:generate  # Generate migration from schema changes (requires TTY)
+npm run db:studio    # Open Drizzle Studio (visual DB browser)
 ```
 
 ---

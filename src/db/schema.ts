@@ -58,6 +58,8 @@ export const events = pgTable("events", {
   hostUserId: uuid("host_user_id").references(() => users.id),
   floorCommunitySlug: text("floor_community_slug"),
   roomBookingId: text("room_booking_id"),
+  lumaEventId: text("luma_event_id"),
+  lumaSyncedAt: timestamp("luma_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -39,6 +39,8 @@ interface EventData {
   recurringType: string | null;
   recurringParentId: string | null;
   recurringEndsAt: string | null;
+  lumaEventId: string | null;
+  lumaSyncedAt: string | null;
   ticketTypes: TicketType[];
 }
 
@@ -76,6 +78,10 @@ export default function EditEventPage() {
   // Waitlist
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [notifying, setNotifying] = useState<string | null>(null);
+
+  // Luma sync
+  const [syncingLuma, setSyncingLuma] = useState(false);
+  const [lumaError, setLumaError] = useState("");
 
   // Ticket type form
   const [newTicketType, setNewTicketType] = useState({
@@ -173,14 +179,44 @@ export default function EditEventPage() {
     const res = await fetch(`/api/admin/events/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "toggle_publish",
-      }),
+      body: JSON.stringify({ action: "toggle_publish" }),
     });
     if (res.ok) {
       const data = await res.json();
-      setEvent((e) => (e ? { ...e, status: data.status } : e));
+      setEvent((e) =>
+        e
+          ? {
+              ...e,
+              status: data.status,
+              lumaEventId: data.lumaEventId ?? e.lumaEventId,
+              lumaSyncedAt: data.lumaSyncedAt ?? e.lumaSyncedAt,
+            }
+          : e
+      );
     }
+  }
+
+  async function syncToLuma() {
+    setSyncingLuma(true);
+    setLumaError("");
+    try {
+      const res = await fetch(`/api/admin/events/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync_luma" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEvent((e) =>
+          e ? { ...e, lumaEventId: data.lumaEventId, lumaSyncedAt: new Date().toISOString() } : e
+        );
+      } else {
+        setLumaError(data.error ?? "Sync failed");
+      }
+    } catch {
+      setLumaError("Network error");
+    }
+    setSyncingLuma(false);
   }
 
   async function generateInstances() {
@@ -304,6 +340,19 @@ export default function EditEventPage() {
             >
               {event.status === "published" ? "Unpublish" : "Publish"}
             </button>
+            {/* Luma sync button */}
+            <button
+              onClick={syncToLuma}
+              disabled={syncingLuma}
+              title={event.lumaEventId ? `Synced to Luma${event.lumaSyncedAt ? ` · ${new Date(event.lumaSyncedAt).toLocaleDateString()}` : ""}` : "Push to Luma"}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                event.lumaEventId
+                  ? "bg-purple-900/30 text-purple-400 hover:bg-purple-900/50"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+              }`}
+            >
+              {syncingLuma ? "Syncing…" : event.lumaEventId ? "✓ Luma" : "→ Luma"}
+            </button>
             <Link
               href={`/e/${event.slug}`}
               className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors"
@@ -313,6 +362,11 @@ export default function EditEventPage() {
           </div>
         </div>
       </header>
+      {lumaError && (
+        <div className="bg-red-900/20 border-b border-red-800 px-4 py-2 text-sm text-red-400 text-center">
+          Luma sync error: {lumaError}
+        </div>
+      )}
 
       <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
         {/* RSVP Summary */}

@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { db } from "@/db";
-import { events, rsvps, orders, contacts } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { events, rsvps, orders, contacts, tickets } from "@/db/schema";
+import { eq, and, sql, count } from "drizzle-orm";
 import type { Metadata } from "next";
 import { NavBar } from "@/components/NavBar";
 import { RSVPButtons } from "@/components/RSVPButtons";
+import { WaitlistForm } from "@/components/WaitlistForm";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,17 @@ export default async function EventPage({ params }: Props) {
 
   const initialCounts = { going: goingCount, maybe: maybeCount, ticketHolders, total: totalCount };
 
+  // Check if sold out for waitlist
+  let isSoldOut = false;
+  if (event.capacity != null) {
+    const ticketCountResult = await db
+      .select({ count: count(tickets.id) })
+      .from(tickets)
+      .innerJoin(orders, eq(tickets.orderId, orders.id))
+      .where(and(eq(tickets.eventId, event.id), eq(orders.status, "completed")));
+    isSoldOut = (ticketCountResult[0]?.count ?? 0) >= event.capacity;
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   const jsonLd = {
@@ -271,14 +283,26 @@ export default async function EventPage({ params }: Props) {
                 </div>
               )}
 
-              {event.ticketTypes.length > 0 && (
+              {isSoldOut ? (
+                <div className="mt-6">
+                  <div className="mb-3 text-center">
+                    <span className="inline-block rounded-full bg-red-900/30 text-red-400 px-3 py-1 text-sm font-medium">
+                      Sold Out
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-400 text-center mb-3">
+                    Join the waitlist to be notified if a spot opens up.
+                  </p>
+                  <WaitlistForm eventSlug={event.slug} eventId={event.id} />
+                </div>
+              ) : event.ticketTypes.length > 0 ? (
                 <Link
                   href={`/e/${event.slug}/checkout`}
                   className="mt-6 block w-full rounded-lg bg-indigo-600 px-4 py-3 text-center font-semibold text-white hover:bg-indigo-500 transition-colors"
                 >
                   Get Tickets
                 </Link>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

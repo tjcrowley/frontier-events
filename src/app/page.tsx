@@ -74,9 +74,17 @@ export default async function HomePage() {
           </div>
         ) : (
           <>
-            <p className="text-white/30 text-sm uppercase tracking-widest font-medium mb-6">
-              Upcoming
-            </p>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-white/30 text-sm uppercase tracking-widest font-medium">
+                Upcoming
+              </p>
+              <Link
+                href="/calendar"
+                className="text-sm text-[#938DEE] hover:text-white transition-colors"
+              >
+                View calendar &rarr;
+              </Link>
+            </div>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {upcomingEvents.map((event) => {
                 const minPrice = event.ticketTypes.length

@@ -61,6 +61,9 @@ export const events = pgTable("events", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  recurringType: text("recurring_type"),  // null | "weekly" | "biweekly" | "monthly"
+  recurringParentId: uuid("recurring_parent_id"),  // FK to events.id (self-ref, added via SQL)
+  recurringEndsAt: timestamp("recurring_ends_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -212,3 +215,19 @@ export const checkinLog = pgTable("checkin_log", {
     .defaultNow(),
   notes: text("notes"),
 });
+
+// ── Waitlist ──────────────────────────────────────────────────────────────
+export const waitlist = pgTable("waitlist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => events.id),
+  userId: uuid("user_id").references(() => users.id),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  position: integer("position").notNull(),
+  status: text("status").notNull().default("waiting"), // "waiting" | "notified" | "converted" | "expired"
+  notifiedAt: timestamp("notified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("waitlist_event_email_idx").on(table.eventId, table.email),
+]);

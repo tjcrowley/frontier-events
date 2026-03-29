@@ -39,6 +39,8 @@ export async function PUT(req: NextRequest, { params }: Props) {
         capacity: body.capacity ?? null,
         coverImageUrl: body.coverImageUrl || null,
         visibility: body.visibility ?? "public",
+        recurringType: body.recurringType || null,
+        recurringEndsAt: body.recurringEndsAt ? new Date(body.recurringEndsAt) : null,
         updatedAt: new Date(),
       })
       .where(eq(events.id, id))

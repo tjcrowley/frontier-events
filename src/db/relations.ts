@@ -11,6 +11,7 @@ import {
   checkinLog,
   rsvps,
   eventMessages,
+  waitlist,
 } from "./schema";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -34,6 +35,12 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     fields: [events.hostUserId],
     references: [users.id],
   }),
+  recurringParent: one(events, {
+    fields: [events.recurringParentId],
+    references: [events.id],
+    relationName: "recurrenceInstances",
+  }),
+  recurrenceInstances: many(events, { relationName: "recurrenceInstances" }),
   eventHosts: many(eventHosts),
   ticketTypes: many(ticketTypes),
   tickets: many(tickets),
@@ -41,6 +48,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   checkinLogs: many(checkinLog),
   rsvps: many(rsvps),
   eventMessages: many(eventMessages),
+  waitlistEntries: many(waitlist),
 }));
 
 export const eventHostsRelations = relations(eventHosts, ({ one }) => ({
@@ -136,5 +144,16 @@ export const checkinLogRelations = relations(checkinLog, ({ one }) => ({
   event: one(events, {
     fields: [checkinLog.eventId],
     references: [events.id],
+  }),
+}));
+
+export const waitlistRelations = relations(waitlist, ({ one }) => ({
+  event: one(events, {
+    fields: [waitlist.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [waitlist.userId],
+    references: [users.id],
   }),
 }));

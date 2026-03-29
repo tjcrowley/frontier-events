@@ -175,6 +175,37 @@ export async function sendEventMessage(params: {
   }
 }
 
+export async function sendWaitlistNotification(params: {
+  email: string;
+  firstName?: string | null;
+  event: { title: string; slug: string; startsAt: Date };
+}): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+  if (!process.env.SENDGRID_API_KEY?.startsWith("SG.")) {
+    console.log(`[email stub] Waitlist notification -> ${params.email} for ${params.event.title}`);
+    return;
+  }
+  const greeting = params.firstName ? `Hi ${params.firstName},` : "Hi,";
+  await sgMail.send({
+    from: process.env.SENDGRID_FROM_EMAIL || "events@frontiertower.io",
+    to: params.email,
+    subject: `A spot opened up: ${params.event.title}`,
+    html: `
+      <div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
+        <div style="background:#0A0A0A;padding:24px;text-align:center;">
+          <h1 style="color:#fff;margin:0;font-size:20px;">Frontier Events</h1>
+        </div>
+        <div style="padding:32px 24px;">
+          <p>${greeting}</p>
+          <p>A spot just opened up for <strong>${params.event.title}</strong>.</p>
+          <p><a href="${appUrl}/e/${params.event.slug}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;">Register now</a></p>
+          <p style="color:#666;font-size:14px;">Spots are first come, first served.</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendNewsletterWelcome(
   email: string,
   firstName: string
